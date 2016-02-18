@@ -1,0 +1,42 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -smp enable
+
+-define(SIZE, 12).
+
+timestable(N, SendPid) ->
+    compute_times(N, ?SIZE, SendPid).
+
+compute_times(_X, 0, _Pid) ->
+    ok;
+compute_times(X, I, Pid) ->
+    Pid ! {result, X, I, X*I, self()},
+    compute_times(X, I-1, Pid).
+
+main([UpperBound]) ->
+    try
+        N = list_to_integer(UpperBound),
+    	spawn_workers(N, self()),
+        listen()
+    catch
+        _:_ -> usage()
+    end.
+
+listen() ->
+    receive
+        {result, X, I, Quot, From} -> io:format("~w x ~w = ~w (~w)~n", [X, I, Quot, From])
+    after 5000 ->
+        io:format("timeout!~n", []),
+        halt(1)
+    end,
+    listen().
+
+usage() ->
+    io:format("usage: timestable integer\n"),
+    halt(1).
+
+spawn_workers(0, _SendPid) ->
+    ok;
+spawn_workers(N, SendPid) ->
+    spawn(fun() -> timestable(N, SendPid) end),
+    spawn_workers(N-1, SendPid).
